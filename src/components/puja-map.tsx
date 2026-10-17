@@ -976,6 +976,8 @@ export default function PujaMap({ onSelectForCard }: PujaMapProps) {
             </form>
           </div>
         </div>
+      )}
+
       {/* Demo Data Notice Modal Popup */}
       {showDemoNoticeModal && (
         <div className="modal-backdrop" onClick={() => setShowDemoNoticeModal(false)}>
