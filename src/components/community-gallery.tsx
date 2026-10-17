@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Share2, Heart, Award, Sparkles, MessageCircle } from "lucide-react";
+import { Share2, Heart } from "lucide-react";
 
 interface CommunityCard {
   id: string;
@@ -107,55 +107,9 @@ export default function CommunityGallery() {
     }).catch((e) => console.warn("Failed to sync like with DB:", e));
   };
 
-  const handleShareChallenge = () => {
-    const text = "🪔 আমি শারদীয়া অ্যাপে নিজের দুর্গোৎসবের শুভেচ্ছা কার্ড বানিয়েছি! আপনিও বানিয়ে ফেলুন আর আমাদের সাথে শেয়ার করুন।\n\nকার কার্ড সবচেয়ে সুন্দর হয় দেখা যাক! 🌸✨";
-    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
-    window.open(url, "_blank");
-  };
-
   return (
     <section className="community-section" id="community">
       <div className="community-container">
-        {/* Viral Challenge Banner */}
-        <div className="viral-challenge-card">
-          <div className="challenge-content">
-            <span className="challenge-badge">
-              <Award size={15} /> ফ্রেন্ডস অ্যান্ড ফ্যামিলি পুজো চ্যালেঞ্জ ১৪৩৩
-            </span>
-            <h3>
-              কার পুজোর কার্ড <em>সবচেয়ে সুন্দর?</em>
-            </h3>
-            <p>
-              নিজের ছবি আর প্রিয় মণ্ডপের নাম দিয়ে কার্ড বানান, বন্ধুদের WhatsApp-এ চ্যালেঞ্জ পাঠান আর দেখুন কার শুভেচ্ছায় সবচেয়ে বেশি ভালোবাসা মেলে!
-            </p>
-            <div className="challenge-buttons">
-              <a href="#editor" className="create-card-action">
-                <Sparkles size={16} /> নিজের কার্ড তৈরি করুন
-              </a>
-              <button className="share-challenge-btn" onClick={handleShareChallenge}>
-                <MessageCircle size={16} /> বন্ধুদের চ্যালেঞ্জ পাঠান
-              </button>
-            </div>
-          </div>
-          <div className="challenge-ornament">
-            <div className="art-circle-ring" />
-            <span className="festive-icon-big">🌸</span>
-          </div>
-        </div>
-
-        {/* Gallery Showcase */}
-        <div className="gallery-header">
-          <div>
-            <p className="eyebrow">কমিউনিটি গ্যালারি</p>
-            <h2>
-              সবার সৃষ্টি, <em>একত্রিত উৎসব</em>
-            </h2>
-          </div>
-          <p className="gallery-desc">
-            বাংলাদেশের বিভিন্ন প্রান্তের বন্ধুদের তৈরি দারুণ সব শারদীয় কার্ড দেখুন ও ভালোবাসা দিন।
-          </p>
-        </div>
-
         <div className="community-cards-grid">
           {cards.map((card) => {
             const isLiked = likedCards[card.id];

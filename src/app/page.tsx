@@ -1,14 +1,39 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import CardEditor from "@/components/card-editor";
 import PujaMap from "@/components/puja-map";
-import CommunityGallery from "@/components/community-gallery";
 import { Sparkles, MapPin, Compass, Lock } from "lucide-react";
 
 export default function Home() {
   const [selectedVenueForCard, setSelectedVenueForCard] = useState<string>("");
+  const [cardDownloadCount, setCardDownloadCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    let isActive = true;
+    const handleCountUpdate = (event: Event) => {
+      const count = (event as CustomEvent<number>).detail;
+      if (typeof count === "number") {
+        setCardDownloadCount((previous) => previous === null ? count : Math.max(previous, count));
+      }
+    };
+
+    window.addEventListener("card-download-count-updated", handleCountUpdate);
+    fetch("/api/card-downloads")
+      .then((response) => response.json())
+      .then((result) => {
+        if (isActive && result.success && typeof result.count === "number") {
+          setCardDownloadCount((previous) => previous === null ? result.count : Math.max(previous, result.count));
+        }
+      })
+      .catch((error) => console.warn("Could not load card download count:", error));
+
+    return () => {
+      isActive = false;
+      window.removeEventListener("card-download-count-updated", handleCountUpdate);
+    };
+  }, []);
 
   const handleSelectVenueForCard = (venueName: string) => {
     setSelectedVenueForCard(venueName);
@@ -43,9 +68,6 @@ export default function Home() {
           </a>
           <a className="nav-link nav-map-link" href="#puja-finder">
             <MapPin size={14} /> পুজো ম্যাপ
-          </a>
-          <a className="nav-link" href="#community">
-            কমিউনিটি
           </a>
           <a className="nav-link" href="#how-it-works">
             ব্যবহার বিধি
@@ -92,7 +114,11 @@ export default function Home() {
               <span>প</span>
               <b>+</b>
             </div>
-            <span>১০,০০০+ ভক্ত ও শুভানুধ্যায়ী ইতিমধ্যে শুভেচ্ছা কার্ড তৈরি করেছেন</span>
+            <span>
+              {cardDownloadCount === null
+                ? "আপনার শুভেচ্ছা কার্ড তৈরি হলে মোট সংখ্যা এখানে দেখাবে"
+                : `এ পর্যন্ত ${cardDownloadCount.toLocaleString("bn-BD")}টি শুভেচ্ছা কার্ড তৈরি ও ডাউনলোড হয়েছে`}
+            </span>
           </div>
         </div>
 
@@ -100,7 +126,7 @@ export default function Home() {
         <div className="hero-real-card-wrap">
           <div className="hero-reference-poster-card">
             <img
-              src="/themes/durga-master-template.jpg"
+              src="/themes/theme-golden-mandap.jpg"
               alt="শারদীয় দুর্গাপূজার খাঁটি পোস্টার ফ্রেম"
               className="reference-poster-img"
             />
@@ -118,26 +144,11 @@ export default function Home() {
 
       {/* Section 1: Dynamic Photo Card Generator */}
       <section className="editor-section" id="editor">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">01 — আপনার শুভেচ্ছা কার্ড</p>
-            <h2>
-              স্মৃতিটা থাকুক <em>উৎসবের ফ্রেমে।</em>
-            </h2>
-          </div>
-          <p>
-            নিজের ছবি, নাম ও মণ্ডপের ঠিকানা দিন। মা দুর্গার প্রতিমা ও বাংলা শুভেচ্ছা সাজিয়ে ডাউনলোড করুন ২× HD প্রিন্ট কোয়ালিটিতে অথবা সরাসরি WhatsApp-এ বন্ধুদের পাঠান।
-          </p>
-        </div>
-
         <CardEditor initialVenueName={selectedVenueForCard} />
       </section>
 
       {/* Section 2: Interactive Puja Finder Map */}
       <PujaMap onSelectForCard={handleSelectVenueForCard} />
-
-      {/* Section 3: Community & Viral Challenge */}
-      <CommunityGallery />
 
       {/* Section 4: How it Works */}
       <section className="how-section" id="how-it-works">

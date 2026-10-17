@@ -66,6 +66,7 @@ export const initialCommunityCards: CommunityCard[] = [
 // In-Memory Fallback State (used when Neon connection string is not yet added)
 let fallbackVenues: PujaVenue[] = [...bangladeshVenues];
 let fallbackCards: CommunityCard[] = [...initialCommunityCards];
+let fallbackCardDownloadCount = 0;
 
 export function cleanDbUrl(rawUrl?: string | null): string | null {
   if (!rawUrl) return null;
@@ -555,5 +556,37 @@ export async function createCommunityCard(card: CommunityCard): Promise<Communit
     fallbackCards = [card, ...fallbackCards];
     return card;
   }
+}
+
+async function ensureCardDownloadsTable() {
+  const sql = getSql();
+  if (!sql) return null;
+  await sql`
+    CREATE TABLE IF NOT EXISTS card_downloads (
+      id BIGSERIAL PRIMARY KEY,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `;
+  return sql;
+}
+
+export async function getCardDownloadCount(): Promise<number> {
+  const sql = await ensureCardDownloadsTable();
+  if (!sql) return fallbackCardDownloadCount;
+
+  const rows = await sql`SELECT COUNT(*)::int AS count FROM card_downloads;`;
+  return Number(rows[0]?.count ?? 0);
+}
+
+export async function recordCardDownload(): Promise<number> {
+  const sql = await ensureCardDownloadsTable();
+  if (!sql) {
+    fallbackCardDownloadCount += 1;
+    return fallbackCardDownloadCount;
+  }
+
+  await sql`INSERT INTO card_downloads DEFAULT VALUES;`;
+  const rows = await sql`SELECT COUNT(*)::int AS count FROM card_downloads;`;
+  return Number(rows[0]?.count ?? 0);
 }
 

@@ -29,39 +29,28 @@ interface PujaMapProps {
   onSelectForCard?: (venueName: string) => void;
 }
 
+const BANGLADESH_DISTRICTS: Record<string, string[]> = {
+  "ঢাকা": ["ঢাকা", "ফরিদপুর", "গাজীপুর", "গোপালগঞ্জ", "কিশোরগঞ্জ", "মাদারীপুর", "মানিকগঞ্জ", "মুন্সিগঞ্জ", "নারায়ণগঞ্জ", "নরসিংদী", "রাজবাড়ী", "শরীয়তপুর", "টাঙ্গাইল"],
+  "চট্টগ্রাম": ["বান্দরবান", "ব্রাহ্মণবাড়িয়া", "চাঁদপুর", "চট্টগ্রাম", "কুমিল্লা", "কক্সবাজার", "ফেনী", "খাগড়াছড়ি", "লক্ষ্মীপুর", "নোয়াখালী", "রাঙামাটি"],
+  "রাজশাহী": ["বগুড়া", "জয়পুরহাট", "নওগাঁ", "নাটোর", "চাঁপাইনবাবগঞ্জ", "পাবনা", "রাজশাহী", "সিরাজগঞ্জ"],
+  "খুলনা": ["বাগেরহাট", "চুয়াডাঙ্গা", "যশোর", "ঝিনাইদহ", "খুলনা", "কুষ্টিয়া", "মাগুরা", "মেহেরপুর", "নড়াইল", "সাতক্ষীরা"],
+  "বরিশাল": ["বরগুনা", "বরিশাল", "ভোলা", "ঝালকাঠি", "পটুয়াখালী", "পিরোজপুর"],
+  "সিলেট": ["হবিগঞ্জ", "মৌলভীবাজার", "সুনামগঞ্জ", "সিলেট"],
+  "রংপুর": ["দিনাজপুর", "গাইবান্ধা", "কুড়িগ্রাম", "লালমনিরহাট", "নীলফামারী", "পঞ্চগড়", "রংপুর", "ঠাকুরগাঁও"],
+  "ময়মনসিংহ": ["জামালপুর", "ময়মনসিংহ", "নেত্রকোণা", "শেরপুর"],
+};
+const DEMO_NOTICE_STORAGE_KEY = "sharodiya_demo_notice_seen_v1";
+
 export default function PujaMap({ onSelectForCard }: PujaMapProps) {
-  // Load persisted venues or fallback to initial Bangladesh venues
-  const [venues, setVenues] = useState<PujaVenue[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("sharodiya_venues_bd_v2");
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch {
-          // ignore
-        }
-      }
-    }
-    return initialVenues;
-  });
+  // Keep server and first client render identical; restore browser state after hydration.
+  const [venues, setVenues] = useState<PujaVenue[]>(initialVenues);
 
   // Track user's own votes { [venueId]: 'real' | 'fake' }
-  const [userVotes, setUserVotes] = useState<Record<string, "real" | "fake">>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("sharodiya_user_votes");
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch {
-          // ignore
-        }
-      }
-    }
-    return {};
-  });
+  const [userVotes, setUserVotes] = useState<Record<string, "real" | "fake">>({});
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedZone, setSelectedZone] = useState<string>("all");
+  const [selectedDivisionFilter, setSelectedDivisionFilter] = useState("");
+  const [selectedDistrictFilter, setSelectedDistrictFilter] = useState("");
   const [selectedCrowd, setSelectedCrowd] = useState<string>("all");
   const [activeVenue, setActiveVenue] = useState<PujaVenue | null>(initialVenues[0]);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -69,7 +58,7 @@ export default function PujaMap({ onSelectForCard }: PujaMapProps) {
   const [viewMode, setViewMode] = useState<"map" | "list">("map");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastType, setToastType] = useState<"success" | "info" | "warning">("success");
-  const [showDemoNoticeModal, setShowDemoNoticeModal] = useState(true);
+  const [showDemoNoticeModal, setShowDemoNoticeModal] = useState(false);
 
   // User's Live Location state
   const [userLiveCoords, setUserLiveCoords] = useState<{ lat: number; lng: number } | null>(null);
@@ -81,7 +70,8 @@ export default function PujaMap({ onSelectForCard }: PujaMapProps) {
   // New venue form state
   const [submitterName, setSubmitterName] = useState("");
   const [newVenueName, setNewVenueName] = useState("");
-  const [newVenueZone, setNewVenueZone] = useState("পুরান ঢাকা");
+  const [selectedDivision, setSelectedDivision] = useState("");
+  const [newVenueDistrict, setNewVenueDistrict] = useState("");
   const [newVenueAddress, setNewVenueAddress] = useState("");
   const [newVenueTheme, setNewVenueTheme] = useState("");
 
@@ -97,11 +87,60 @@ export default function PujaMap({ onSelectForCard }: PujaMapProps) {
     setTimeout(() => setToastMessage(null), 4500);
   };
 
+  useEffect(() => {
+    try {
+      const savedVenues = window.localStorage.getItem("sharodiya_venues_bd_v2");
+      if (savedVenues) {
+        const parsedVenues: unknown = JSON.parse(savedVenues);
+        if (Array.isArray(parsedVenues)) setVenues(parsedVenues as PujaVenue[]);
+      }
+
+      const savedVotes = window.localStorage.getItem("sharodiya_user_votes");
+      if (savedVotes) {
+        const parsedVotes: unknown = JSON.parse(savedVotes);
+        if (parsedVotes && typeof parsedVotes === "object" && !Array.isArray(parsedVotes)) {
+          setUserVotes(parsedVotes as Record<string, "real" | "fake">);
+        }
+      }
+    } catch {
+      // Ignore invalid or unavailable browser storage and keep the initial data.
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(DEMO_NOTICE_STORAGE_KEY) !== "true") {
+        setShowDemoNoticeModal(true);
+        window.localStorage.setItem(DEMO_NOTICE_STORAGE_KEY, "true");
+      }
+    } catch {
+      setShowDemoNoticeModal(true);
+    }
+  }, []);
+
+  const dismissDemoNotice = () => {
+    setShowDemoNoticeModal(false);
+    try {
+      window.localStorage.setItem(DEMO_NOTICE_STORAGE_KEY, "true");
+    } catch {
+      // Keep the notice dismissed for the current visit if storage is unavailable.
+    }
+  };
+
   // Filter venues
   const filteredVenues = useMemo(() => {
     return venues.filter((v) => {
-      if (selectedZone !== "all" && v.zone !== selectedZone) return false;
       if (selectedCrowd !== "all" && v.crowdStatus !== selectedCrowd) return false;
+      const venueDivision =
+        v.tags.find((tag) => Object.prototype.hasOwnProperty.call(BANGLADESH_DISTRICTS, tag)) ??
+        Object.entries(BANGLADESH_DISTRICTS).find(([, districts]) => districts.includes(v.district))?.[0];
+      if (selectedDivisionFilter && venueDivision !== selectedDivisionFilter) return false;
+      if (
+        selectedDistrictFilter &&
+        v.district !== selectedDistrictFilter &&
+        v.zone !== selectedDistrictFilter &&
+        !v.tags.includes(selectedDistrictFilter)
+      ) return false;
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         const matchesName = v.name.toLowerCase().includes(query);
@@ -113,12 +152,33 @@ export default function PujaMap({ onSelectForCard }: PujaMapProps) {
       }
       return true;
     });
-  }, [venues, selectedZone, selectedCrowd, searchQuery]);
+  }, [venues, selectedDivisionFilter, selectedDistrictFilter, selectedCrowd, searchQuery]);
 
-  // Unique zones in Bangladesh
-  const zones = useMemo(() => {
-    const list = venues.map((v) => v.zone);
-    return Array.from(new Set(list));
+  const venueStats = useMemo(() => {
+    const divisionCounts = new Map<string, number>();
+    const districtCounts = new Map<string, number>();
+
+    venues.forEach((venue) => {
+      const division =
+        venue.tags.find((tag) => Object.prototype.hasOwnProperty.call(BANGLADESH_DISTRICTS, tag)) ??
+        Object.entries(BANGLADESH_DISTRICTS).find(([, districts]) => districts.includes(venue.district))?.[0];
+      if (division) divisionCounts.set(division, (divisionCounts.get(division) ?? 0) + 1);
+
+      const district = venue.district?.trim() || venue.zone?.trim();
+      if (district) districtCounts.set(district, (districtCounts.get(district) ?? 0) + 1);
+    });
+
+    const highestCount = (counts: Map<string, number>) =>
+      Array.from(counts.entries()).reduce<[string, number]>(
+        (highest, current) => (current[1] > highest[1] ? current : highest),
+        ["তথ্য নেই", 0]
+      );
+
+    return {
+      total: venues.length,
+      topDivision: highestCount(divisionCounts),
+      topDistrict: highestCount(districtCounts),
+    };
   }, [venues]);
 
   // Sync with live Neon PostgreSQL / API
@@ -372,6 +432,13 @@ export default function PujaMap({ onSelectForCard }: PujaMapProps) {
 
   // Locate User's Real-time Live Location
   const handleGoToLiveLocation = () => {
+    setViewMode("map");
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        mapContainerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    });
+
     if (!navigator.geolocation) {
       showToast("আপনার ব্রাউজারে লোকেশন সার্ভিস সাপোর্ট করে না।", "warning");
       return;
@@ -499,7 +566,7 @@ export default function PujaMap({ onSelectForCard }: PujaMapProps) {
   // Add new venue form submission
   const handleAddNewVenue = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newVenueName.trim()) return;
+    if (!submitterName.trim() || !newVenueName.trim() || !newVenueDistrict) return;
 
     // Use clicked location or user live location or fallback to Dhaka center
     const targetLat = clickedLocation?.lat || userLiveCoords?.lat || (23.7380 + (Math.random() - 0.5) * 0.03);
@@ -508,9 +575,9 @@ export default function PujaMap({ onSelectForCard }: PujaMapProps) {
     const newVenue: PujaVenue = {
       id: "venue-bd-" + Date.now(),
       name: newVenueName.trim(),
-      zone: newVenueZone.trim() || "ঢাকা",
-      district: "ঢাকা",
-      address: newVenueAddress.trim() || `${newVenueZone}, ঢাকা`,
+      zone: newVenueDistrict,
+      district: newVenueDistrict,
+      address: newVenueAddress.trim() || `${newVenueDistrict}, ${selectedDivision}`,
       lat: Number(targetLat.toFixed(5)),
       lng: Number(targetLng.toFixed(5)),
       theme: newVenueTheme.trim() || "কমিউনিটি সার্বজনীন শারদীয় দুর্গোৎসব",
@@ -521,8 +588,8 @@ export default function PujaMap({ onSelectForCard }: PujaMapProps) {
       isIconic: false,
       verified: true,
       mapLink: `https://maps.google.com/?q=${targetLat},${targetLng}`,
-      tags: ["নতুন মণ্ডপ", newVenueZone],
-      addedBy: submitterName.trim() || "ভক্ত / কমিউনিটি সদস্য",
+      tags: ["নতুন মণ্ডপ", selectedDivision, newVenueDistrict],
+      addedBy: submitterName.trim(),
       addedAt: "এইমাত্র যুক্ত করা হয়েছে",
       realVotes: 1,
       fakeVotes: 0,
@@ -546,6 +613,8 @@ export default function PujaMap({ onSelectForCard }: PujaMapProps) {
     setActiveVenue(newVenue);
     setSubmitterName("");
     setNewVenueName("");
+    setSelectedDivision("");
+    setNewVenueDistrict("");
     setNewVenueAddress("");
     setNewVenueTheme("");
 
@@ -565,29 +634,24 @@ export default function PujaMap({ onSelectForCard }: PujaMapProps) {
             <span className="live-pulse" /> বাংলাদেশ পূজা পরিক্রমা ও লাইভ ভিড়
           </p>
           <h2>
-            ঢাকা ও দেশের <em>পূজা মণ্ডপ</em> খুঁজুন
+          <em>পূজা মণ্ডপ</em> খুঁজুন
           </h2>
-          <p className="section-subtext">
-            ঢাকেশ্বরী জাতীয় মন্দির, রমনা কালী মন্দির, শাঁখারীবাজার, বনানীসহ সারা দেশের বিখ্যাত মণ্ডপগুলোর লাইভ ভিড় ও কমিউনিটি ভেরিফিকেশন।
-          </p>
+          <div className="puja-summary-stats" aria-label="বাংলাদেশের পূজা মণ্ডপের পরিসংখ্যান">
+            <div className="puja-summary-stat">
+              <span>মোট পূজা মণ্ডপ</span>
+              <strong>{venueStats.total.toLocaleString("bn-BD")}</strong>
+            </div>
+            <div className="puja-summary-stat">
+              <span>সবচেয়ে বেশি বিভাগ</span>
+              <strong>{venueStats.topDivision[0]} <small>({venueStats.topDivision[1].toLocaleString("bn-BD")})</small></strong>
+            </div>
+            <div className="puja-summary-stat">
+              <span>সবচেয়ে বেশি জেলা</span>
+              <strong>{venueStats.topDistrict[0]} <small>({venueStats.topDistrict[1].toLocaleString("bn-BD")})</small></strong>
+            </div>
+          </div>
         </div>
 
-        <div className="city-toggle-wrap">
-          <button 
-            className="live-loc-action-btn"
-            onClick={handleGoToLiveLocation}
-            disabled={isLocating}
-            title="আপনার বর্তমান লাইভ লোকেশনে ম্যাপ নিয়ে যান"
-          >
-            <LocateFixed size={16} className={isLocating ? "spin-icon" : ""} />
-            <span>{isLocating ? "শনাক্ত হচ্ছে..." : "আমার লাইভ লোকেশন"}</span>
-          </button>
-
-          <button className="add-venue-btn" onClick={() => setShowAddModal(true)}>
-            <PlusCircle size={16} />
-            <span>নতুন মণ্ডপ যোগ করুন</span>
-          </button>
-        </div>
       </div>
 
       {/* Demo Data Warning Announcement Strip */}
@@ -625,7 +689,7 @@ export default function PujaMap({ onSelectForCard }: PujaMapProps) {
           <Search size={16} className="search-icon" />
           <input
             type="text"
-            placeholder="মণ্ডপের নাম, এলাকা বা কে যুক্ত করেছেন দিয়ে খুঁজুন..."
+            placeholder="মণ্ডপের নাম বা যিনি যোগ করেছেন, লিখে খুঁজুন..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -639,12 +703,32 @@ export default function PujaMap({ onSelectForCard }: PujaMapProps) {
         <div className="filter-dropdowns">
           <div className="select-pill">
             <SlidersHorizontal size={14} />
-            <select value={selectedZone} onChange={(e) => setSelectedZone(e.target.value)}>
-              <option value="all">সব এলাকা</option>
-              {zones.map((zone) => (
-                <option key={zone} value={zone}>
-                  {zone}
-                </option>
+            <select
+              aria-label="বিভাগ দিয়ে মণ্ডপ ফিল্টার করুন"
+              value={selectedDivisionFilter}
+              onChange={(e) => {
+                setSelectedDivisionFilter(e.target.value);
+                setSelectedDistrictFilter("");
+              }}
+            >
+              <option value="">সব বিভাগ</option>
+              {Object.keys(BANGLADESH_DISTRICTS).map((division) => (
+                <option key={division} value={division}>{division}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="select-pill">
+            <MapPin size={14} />
+            <select
+              aria-label="জেলা দিয়ে মণ্ডপ ফিল্টার করুন"
+              value={selectedDistrictFilter}
+              onChange={(e) => setSelectedDistrictFilter(e.target.value)}
+              disabled={!selectedDivisionFilter}
+            >
+              <option value="">{selectedDivisionFilter ? "সব জেলা" : "আগে বিভাগ বাছুন"}</option>
+              {(BANGLADESH_DISTRICTS[selectedDivisionFilter] ?? []).map((district) => (
+                <option key={district} value={district}>{district}</option>
               ))}
             </select>
           </div>
@@ -697,7 +781,8 @@ export default function PujaMap({ onSelectForCard }: PujaMapProps) {
                 <button
                   onClick={() => {
                     setSearchQuery("");
-                    setSelectedZone("all");
+                    setSelectedDivisionFilter("");
+                    setSelectedDistrictFilter("");
                     setSelectedCrowd("all");
                   }}
                 >
@@ -907,7 +992,26 @@ export default function PujaMap({ onSelectForCard }: PujaMapProps) {
             </div>
           )}
         </div>
+
+        <div className="city-toggle-wrap map-actions-row">
+          <button
+            className="live-loc-action-btn"
+            onClick={handleGoToLiveLocation}
+            disabled={isLocating}
+            title="আপনার বর্তমান লাইভ লোকেশনে ম্যাপ নিয়ে যান"
+          >
+            <LocateFixed size={16} className={isLocating ? "spin-icon" : ""} />
+            <span>{isLocating ? "শনাক্ত হচ্ছে..." : "আমার লাইভ লোকেশন"}</span>
+          </button>
+
+          <button className="add-venue-btn" onClick={() => setShowAddModal(true)}>
+            <PlusCircle size={16} />
+            <span>নতুন মণ্ডপ যোগ করুন</span>
+          </button>
+        </div>
       </div>
+
+
 
       {/* Add New Mandap Modal */}
       {showAddModal && (
@@ -959,14 +1063,40 @@ export default function PujaMap({ onSelectForCard }: PujaMapProps) {
               </div>
 
               <div className="form-field">
-                <label>এলাকা / জোন *</label>
-                <input
-                  type="text"
+                <label htmlFor="venue-division">বিভাগ *</label>
+                <select
+                  id="venue-division"
                   required
-                  placeholder="যেমন: পুরান ঢাকা / ধানমন্ডি / মিরপুর / গুলশান"
-                  value={newVenueZone}
-                  onChange={(e) => setNewVenueZone(e.target.value)}
-                />
+                  value={selectedDivision}
+                  onChange={(e) => {
+                    const division = e.target.value;
+                    setSelectedDivision(division);
+                    setNewVenueDistrict("");
+                  }}
+                >
+                  <option value="" disabled>বিভাগ নির্বাচন করুন</option>
+                  {Object.keys(BANGLADESH_DISTRICTS).map((division) => (
+                    <option key={division} value={division}>{division}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="venue-district">জেলা *</label>
+                <select
+                  id="venue-district"
+                  required
+                  value={newVenueDistrict}
+                  onChange={(e) => setNewVenueDistrict(e.target.value)}
+                  disabled={!selectedDivision}
+                >
+                  <option value="" disabled>
+                    {selectedDivision ? "জেলা নির্বাচন করুন" : "আগে বিভাগ নির্বাচন করুন"}
+                  </option>
+                  {(BANGLADESH_DISTRICTS[selectedDivision] ?? []).map((district) => (
+                    <option key={district} value={district}>{district}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="form-field">
@@ -1008,14 +1138,14 @@ export default function PujaMap({ onSelectForCard }: PujaMapProps) {
 
       {/* Demo Data Notice Modal Popup */}
       {showDemoNoticeModal && (
-        <div className="modal-backdrop" onClick={() => setShowDemoNoticeModal(false)}>
+        <div className="modal-backdrop" onClick={dismissDemoNotice}>
           <div className="modal-content demo-notice-popup-card" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                 <span className="warning-modal-badge">⚠️ ঘোষণা</span>
                 <h3 style={{ margin: 0, color: "#854d0e" }}>শারদীয় ম্যাপ সংক্রান্ত বিজ্ঞপ্তি</h3>
               </div>
-              <button className="close-btn" onClick={() => setShowDemoNoticeModal(false)}>
+              <button className="close-btn" onClick={dismissDemoNotice}>
                 <X size={18} />
               </button>
             </div>
@@ -1056,7 +1186,7 @@ export default function PujaMap({ onSelectForCard }: PujaMapProps) {
                 type="button" 
                 className="btn-primary" 
                 style={{ width: "100%", padding: "13px", fontSize: "14px", fontWeight: "600" }}
-                onClick={() => setShowDemoNoticeModal(false)}
+                onClick={dismissDemoNotice}
               >
                 আমি বুঝতে পেরেছি (ম্যাপ শুরু করুন)
               </button>

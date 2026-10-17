@@ -30,6 +30,15 @@ interface CardEditorProps {
   initialVenueName?: string;
 }
 
+const festivalTaglines = [
+  "শুভ মহালয়া",
+  "শুভ মহাসপ্তমী",
+  "শুভ মহাষ্টমী",
+  "শুভ মহাষষ্ঠী",
+  "শুভ মহানবমী",
+  "শুভ বিজয়া দশমী",
+] as const;
+
 export default function CardEditor({ initialVenueName }: CardEditorProps) {
   const userPhotoInputRef = useRef<HTMLInputElement>(null);
   const previewCardRef = useRef<HTMLDivElement>(null);
@@ -44,6 +53,12 @@ export default function CardEditor({ initialVenueName }: CardEditorProps) {
   // User inputs
   const [userName, setUserName] = useState("ধনঞ্জয় চন্দ্র দাস");
   const [userLocation, setUserLocation] = useState(initialVenueName || "শ্রী শ্রী ঢাকেশ্বরী জাতীয় মন্দির, ঢাকা");
+  const [taglineText, setTaglineText] = useState<string>(festivalTaglines[0]);
+
+  const cycleFestivalTagline = () => {
+    const currentIndex = festivalTaglines.indexOf(taglineText as (typeof festivalTaglines)[number]);
+    setTaglineText(festivalTaglines[(currentIndex + 1) % festivalTaglines.length]);
+  };
 
   // Editable Texts (used in custom text mode and for all themes)
   const [quoteText, setQuoteText] = useState(bannerThemes[0].quote);
@@ -148,6 +163,28 @@ export default function CardEditor({ initialVenueName }: CardEditorProps) {
       // Ensure fonts are loaded
       await document.fonts.ready;
 
+      const drawLocationBadge = (label: string, centerX: number, baselineY: number, fontSize: number, darkTheme = false) => {
+        ctx.save();
+        ctx.font = `600 ${fontSize}px "Noto Sans Bengali", sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        // Keep the location badge inside the same right-side text column as the preview.
+        const maxTextWidth = W * 0.4 - 36;
+        const textWidth = Math.min(ctx.measureText(label).width, maxTextWidth);
+        const badgeWidth = textWidth + 36;
+        const badgeHeight = fontSize * 1.75;
+        ctx.fillStyle = darkTheme ? "rgba(75, 26, 14, 0.94)" : "rgba(255, 248, 225, 0.96)";
+        ctx.strokeStyle = darkTheme ? "rgba(255, 216, 128, 0.75)" : "rgba(151, 100, 30, 0.6)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(centerX - badgeWidth / 2, baselineY - badgeHeight / 2, badgeWidth, badgeHeight, badgeHeight / 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = darkTheme ? "#fff0bd" : "#5c3e27";
+        ctx.fillText(label, centerX, baselineY, maxTextWidth);
+        ctx.restore();
+      };
+
       // 1. Draw High-Res Background Image
       const bgImg = new Image();
       bgImg.crossOrigin = "anonymous";
@@ -169,79 +206,89 @@ export default function CardEditor({ initialVenueName }: CardEditorProps) {
             userImg.src = userPhotoUrl;
           });
 
-          ctx.save();
-
-          // Left photo placement area
-          const targetW = 760;
-          const targetH = 1120;
-          const scale = Math.min(targetW / userImg.width, targetH / userImg.height) * photoScale;
-          const drawW = userImg.width * scale;
-          const drawH = userImg.height * scale;
-          const drawX = 50 + photoOffsetX * 2;
-          const drawY = H - drawH - 10 + photoOffsetY * 2;
-
-          if (photoFrameStyle === "circle") {
-            const centerX = drawX + drawW / 2;
-            const centerY = drawY + drawH / 2;
-            const radius = Math.min(drawW, drawH) / 2;
-
-            ctx.save();
-            ctx.beginPath();
-            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-            ctx.closePath();
-            ctx.shadowColor = "rgba(0,0,0,0.5)";
-            ctx.shadowBlur = 30;
-            ctx.clip();
+          const slotCenterX = W * 0.2;
+          const offsetX = photoOffsetX * 2;
+          const offsetY = photoOffsetY * 2;
+          const drawCover = (x: number, y: number, width: number, height: number) => {
+            const coverScale = Math.max(width / userImg.width, height / userImg.height);
+            const sourceWidth = width / coverScale;
+            const sourceHeight = height / coverScale;
+            const sourceX = (userImg.width - sourceWidth) / 2;
+            const sourceY = (userImg.height - sourceHeight) / 2;
 
             if (photoFlipped) {
-              ctx.translate(drawX + drawW, drawY);
+              ctx.translate(x + width, y);
               ctx.scale(-1, 1);
-              ctx.drawImage(userImg, 0, 0, drawW, drawH);
+              ctx.drawImage(userImg, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, width, height);
             } else {
-              ctx.drawImage(userImg, drawX, drawY, drawW, drawH);
+              ctx.drawImage(userImg, sourceX, sourceY, sourceWidth, sourceHeight, x, y, width, height);
             }
-            ctx.restore();
+          };
 
-            // Gold ring border
+          if (photoFrameStyle === "circle") {
+            // Match the preview's 210 px circular frame at its 820 px poster width.
+            const diameter = W * (210 / 820) * photoScale;
+            const drawX = slotCenterX - diameter / 2 + offsetX;
+            const drawY = H - diameter - H * (25 / 550) + offsetY;
+            const centerX = drawX + diameter / 2;
+            const centerY = drawY + diameter / 2;
+            const radius = diameter / 2;
+
             ctx.save();
             ctx.beginPath();
             ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-            ctx.lineWidth = 14;
+            ctx.clip();
+            ctx.shadowColor = "rgba(0,0,0,0.5)";
+            ctx.shadowBlur = 30;
+            drawCover(drawX, drawY, diameter, diameter);
+            ctx.restore();
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            ctx.lineWidth = 4 * (W / 820);
             ctx.strokeStyle = "#d4af37";
             ctx.stroke();
             ctx.restore();
           } else if (photoFrameStyle === "rounded") {
+            // Match the preview's 220 x 270 px portrait frame.
+            const frameWidth = W * (220 / 820) * photoScale;
+            const frameHeight = H * (270 / 550) * photoScale;
+            const drawX = slotCenterX - frameWidth / 2 + offsetX;
+            const drawY = H - frameHeight - H * (20 / 550) + offsetY;
+            const radius = 16 * (W / 820) * photoScale;
+
             ctx.save();
             ctx.beginPath();
-            const r = 24;
-            ctx.roundRect(drawX, drawY, drawW, drawH, r);
+            ctx.roundRect(drawX, drawY, frameWidth, frameHeight, radius);
+            ctx.clip();
             ctx.shadowColor = "rgba(0,0,0,0.45)";
             ctx.shadowBlur = 30;
-            ctx.clip();
-
-            if (photoFlipped) {
-              ctx.translate(drawX + drawW, drawY);
-              ctx.scale(-1, 1);
-              ctx.drawImage(userImg, 0, 0, drawW, drawH);
-            } else {
-              ctx.drawImage(userImg, drawX, drawY, drawW, drawH);
-            }
+            drawCover(drawX, drawY, frameWidth, frameHeight);
             ctx.restore();
 
             ctx.save();
             ctx.beginPath();
-            ctx.roundRect(drawX, drawY, drawW, drawH, r);
-            ctx.lineWidth = 8;
+            ctx.roundRect(drawX, drawY, frameWidth, frameHeight, radius);
+            ctx.lineWidth = 3.5 * (W / 820);
             ctx.strokeStyle = "#d4af37";
             ctx.stroke();
             ctx.restore();
           } else {
-            // Cutout style (direct, with soft natural shadow)
+            // Keep the cutout inside the preview's left photo column.
+            const targetW = W * 0.34;
+            const targetH = H * 0.84;
+            const scale = Math.min(targetW / userImg.width, targetH / userImg.height) * photoScale;
+            const drawW = userImg.width * scale;
+            const drawH = userImg.height * scale;
+            const drawX = slotCenterX - drawW / 2 + offsetX;
+            const drawY = H - drawH + offsetY;
+
+            ctx.save();
             ctx.shadowColor = "rgba(0,0,0,0.45)";
             ctx.shadowBlur = 40;
             ctx.shadowOffsetX = 10;
             ctx.shadowOffsetY = 10;
-
             if (photoFlipped) {
               ctx.translate(drawX + drawW, drawY);
               ctx.scale(-1, 1);
@@ -249,12 +296,35 @@ export default function CardEditor({ initialVenueName }: CardEditorProps) {
             } else {
               ctx.drawImage(userImg, drawX, drawY, drawW, drawH);
             }
+            ctx.restore();
           }
-
-          ctx.restore();
         } catch (e) {
           console.error("Could not render user photo to canvas", e);
         }
+      }
+
+      if (taglineText.trim()) {
+        const boxX = W * 0.035;
+        const boxY = H * 0.045;
+        const boxW = W * 0.32;
+        const boxH = 86;
+        ctx.save();
+        ctx.shadowColor = "rgba(70, 37, 12, 0.22)";
+        ctx.shadowBlur = 16;
+        ctx.fillStyle = "rgba(255, 248, 220, 0.88)";
+        ctx.strokeStyle = "rgba(168, 107, 27, 0.68)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(boxX, boxY, boxW, boxH, 24);
+        ctx.fill();
+        ctx.stroke();
+        ctx.shadowColor = "transparent";
+        ctx.font = 'bold 40px "Noto Serif Bengali", Georgia, serif';
+        ctx.fillStyle = "#7b251b";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(taglineText, boxX + boxW / 2, boxY + boxH / 2, boxW - 36);
+        ctx.restore();
       }
 
       // 3. Render Center Typography
@@ -276,12 +346,7 @@ export default function CardEditor({ initialVenueName }: CardEditorProps) {
 
         // Render Location
         if (userLocation) {
-          ctx.save();
-          ctx.font = '600 30px "Noto Sans Bengali", sans-serif';
-          ctx.fillStyle = "#6e421e";
-          ctx.textAlign = "center";
-          ctx.fillText(`📍 ${userLocation} · শারদীয়া ১৪৩৩`, centerX, locY);
-          ctx.restore();
+          drawLocationBadge(`📍 ${userLocation} · শারদীয়া ১৪৩৩`, centerX, locY, 30);
         }
 
         // Flourish line
@@ -422,23 +487,30 @@ export default function CardEditor({ initialVenueName }: CardEditorProps) {
 
         // Location: "📍 শ্রী শ্রী ঢাকেশ্বরী জাতীয় মন্দির, ঢাকা"
         if (userLocation) {
-          ctx.save();
-          ctx.font = '500 28px "Noto Sans Bengali", sans-serif';
-          ctx.fillStyle = activeTheme.darkTheme ? "#ffd700" : "#5c4738";
-          ctx.textAlign = "center";
-          ctx.fillText(`📍 ${userLocation} · শারদীয়া ১৪৩৩`, centerX, currentY + 205);
-          ctx.restore();
+          drawLocationBadge(`📍 ${userLocation} · শারদীয়া ১৪৩৩`, centerX, currentY + 205, 28, activeTheme.darkTheme);
         }
       }
 
       // 4. Download high-res PNG image
       canvas.toBlob((blob) => {
-        if (!blob) return;
+        if (!blob) {
+          setIsExporting(false);
+          return;
+        }
         const link = document.createElement("a");
         link.download = `durga-puja-poster-${userName.replace(/\s+/g, "-")}.png`;
         link.href = URL.createObjectURL(blob);
         link.click();
         setIsExporting(false);
+
+        fetch("/api/card-downloads", { method: "POST" })
+          .then((response) => response.json())
+          .then((result) => {
+            if (result.success && typeof result.count === "number") {
+              window.dispatchEvent(new CustomEvent("card-download-count-updated", { detail: result.count }));
+            }
+          })
+          .catch((error) => console.warn("Could not update card download count:", error));
       }, "image/png");
     } catch (err) {
       console.error("Export error", err);
@@ -488,16 +560,6 @@ export default function CardEditor({ initialVenueName }: CardEditorProps) {
           )}
         </div>
 
-        <div className="export-actions-wrap">
-          <button className="whatsapp-share-btn" onClick={handleWhatsAppShare} title="WhatsApp এ পাঠান">
-            <Share2 size={16} />
-            <span>WhatsApp-এ পাঠান</span>
-          </button>
-          <button className="export-hd-btn" onClick={handleDownloadHd} disabled={isExporting}>
-            <Download size={16} />
-            <span>{isExporting ? "পোস্টার তৈরি হচ্ছে..." : "২× HD ব্যানার ডাউনলোড করুন"}</span>
-          </button>
-        </div>
       </div>
 
       {/* Main Studio Grid */}
@@ -556,22 +618,25 @@ export default function CardEditor({ initialVenueName }: CardEditorProps) {
                   <label className="step-title">আপনার নাম ও মণ্ডপের ঠিকানা</label>
 
                   <div className="input-group">
-                    <label style={{ fontSize: "11px", color: "#666", marginBottom: "4px", display: "block" }}>
+                    <label className="field-label" htmlFor="quick-sender-name">
                       পোস্টারে যে নাম দেখাবে:
                     </label>
                     <input
+                      id="quick-sender-name"
                       type="text"
+                      autoComplete="name"
                       placeholder="আপনার নাম লিখুন (যেমন: ধনঞ্জয় চন্দ্র দাস)"
                       value={userName}
                       onChange={(e) => setUserName(e.target.value)}
                     />
                   </div>
 
-                  <div className="input-group" style={{ marginTop: "10px" }}>
-                    <label style={{ fontSize: "11px", color: "#666", marginBottom: "4px", display: "block" }}>
+                  <div className="input-group">
+                    <label className="field-label" htmlFor="quick-venue-location">
                       পূজা মণ্ডপ বা জেলার নাম:
                     </label>
                     <input
+                      id="quick-venue-location"
                       type="text"
                       placeholder="স্থান বা মণ্ডপ (যেমন: শ্রী শ্রী ঢাকেশ্বরী জাতীয় মন্দির, ঢাকা)"
                       value={userLocation}
@@ -596,6 +661,23 @@ export default function CardEditor({ initialVenueName }: CardEditorProps) {
                         {loc.split(",")[0]}
                       </button>
                     ))}
+                  </div>
+
+                  <div className="input-group tagline-select-group">
+                    <label className="field-label" htmlFor="festival-tagline">
+                      পোস্টারের পাতার পাশে উৎসবের ট্যাগলাইন:
+                    </label>
+                    <select
+                      id="festival-tagline"
+                      value={taglineText}
+                      onChange={(e) => setTaglineText(e.target.value)}
+                    >
+                      <option value="">ট্যাগলাইন দেখাবেন না</option>
+                      {festivalTaglines.map((tagline) => (
+                        <option key={tagline} value={tagline}>{tagline}</option>
+                      ))}
+                    </select>
+                    <small>কার্ডের ওপরের বাম পাশে ট্যাগলাইনে ক্লিক করেও বদলাতে পারবেন।</small>
                   </div>
                 </div>
 
@@ -827,72 +909,89 @@ export default function CardEditor({ initialVenueName }: CardEditorProps) {
                 )}
 
                 <div className="input-group">
-                  <label>আপনার নাম (প্রেরক)</label>
+                  <label htmlFor="custom-sender-name">আপনার নাম (প্রেরক)</label>
                   <input
+                    id="custom-sender-name"
                     type="text"
+                    autoComplete="name"
+                    placeholder="যেমন: ধনঞ্জয় চন্দ্র দাস"
                     value={userName}
                     onChange={(e) => setUserName(e.target.value)}
                   />
                 </div>
 
                 <div className="input-group">
-                  <label>স্থান বা মণ্ডপের নাম</label>
+                  <label htmlFor="custom-venue-location">স্থান বা মণ্ডপের নাম</label>
                   <input
+                    id="custom-venue-location"
                     type="text"
+                    placeholder="যেমন: শ্রী শ্রী ঢাকেশ্বরী জাতীয় মন্দির, ঢাকা"
                     value={userLocation}
                     onChange={(e) => setUserLocation(e.target.value)}
                   />
                 </div>
 
                 <div className="input-group">
-                  <label>উপরের অনুপ্রেরণামূলক উক্তি</label>
+                  <label htmlFor="custom-quote">উপরের অনুপ্রেরণামূলক উক্তি</label>
                   <textarea
+                    id="custom-quote"
                     rows={2}
+                    placeholder="যেমন: শরতের আলোয় ভরে উঠুক সবার জীবন"
                     value={quoteText}
                     onChange={(e) => handleTextChange(() => setQuoteText(e.target.value))}
                   />
                 </div>
 
                 <div className="input-group">
-                  <label>হেডিং প্রিফিক্স</label>
+                  <label htmlFor="custom-heading-prefix">শিরোনামের শুরুর অংশ</label>
                   <input
+                    id="custom-heading-prefix"
                     type="text"
+                    placeholder="যেমন: এই পুজোয়,"
                     value={headingPrefix}
                     onChange={(e) => handleTextChange(() => setHeadingPrefix(e.target.value))}
                   />
                 </div>
 
                 <div className="input-group">
-                  <label>প্রধান উৎসবের শিরোনাম (Calligraphy Main)</label>
+                  <label htmlFor="custom-heading-main">প্রধান উৎসবের শিরোনাম</label>
                   <input
+                    id="custom-heading-main"
                     type="text"
+                    placeholder="যেমন: দুর্গোৎসব"
                     value={headingMain}
                     onChange={(e) => handleTextChange(() => setHeadingMain(e.target.value))}
                   />
                 </div>
 
                 <div className="input-group">
-                  <label>হেডিং সাফিক্স</label>
+                  <label htmlFor="custom-heading-suffix">শিরোনামের শেষের অংশ</label>
                   <input
+                    id="custom-heading-suffix"
                     type="text"
+                    placeholder="যেমন: মনটা বাড়ি ফেরে।"
                     value={headingSuffix}
                     onChange={(e) => handleTextChange(() => setHeadingSuffix(e.target.value))}
                   />
                 </div>
 
                 <div className="input-group">
-                  <label>আশীর্বাদ ও শুভেচ্ছা বার্তা</label>
+                  <label htmlFor="custom-blessing-message">আশীর্বাদ ও শুভেচ্ছা বার্তা</label>
                   <textarea
+                    id="custom-blessing-message"
                     rows={3}
+                    placeholder="আপনার নিজের শুভেচ্ছা বার্তা লিখুন"
                     value={blessingMessage}
                     onChange={(e) => handleTextChange(() => setBlessingMessage(e.target.value))}
                   />
                 </div>
 
                 <div className="input-group">
-                  <label>সমাপনী বার্তা</label>
+                  <label htmlFor="custom-closing-tag">সমাপনী বার্তা</label>
                   <input
+                    id="custom-closing-tag"
                     type="text"
+                    placeholder="যেমন: শুভ শারদীয়া"
                     value={closingTag}
                     onChange={(e) => handleTextChange(() => setClosingTag(e.target.value))}
                   />
@@ -1049,6 +1148,16 @@ export default function CardEditor({ initialVenueName }: CardEditorProps) {
                 className="poster-bg-img"
               />
 
+              <button
+                type="button"
+                className={`poster-tagline-overlay ${taglineText ? "" : "is-empty"}`}
+                onClick={cycleFestivalTagline}
+                aria-label="উৎসবের ট্যাগলাইন বদলান"
+                title="পরের উৎসবের ট্যাগলাইন দেখতে ক্লিক করুন"
+              >
+                {taglineText || "+ উৎসবের শুভেচ্ছা যোগ করুন"}
+              </button>
+
               {/* 2. User's Cutout Photo on the Left */}
               <div className="poster-user-photo-slot">
                 {userPhotoUrl ? (
@@ -1159,6 +1268,16 @@ export default function CardEditor({ initialVenueName }: CardEditorProps) {
             </div>
           </div>
         </div>
+      </div>
+      <div className="export-actions-wrap editor-bottom-actions">
+        <button className="whatsapp-share-btn" onClick={handleWhatsAppShare} title="WhatsApp এ পাঠান">
+          <Share2 size={16} />
+          <span>WhatsApp-এ পাঠান</span>
+        </button>
+        <button className="export-hd-btn" onClick={handleDownloadHd} disabled={isExporting}>
+          <Download size={16} />
+          <span>{isExporting ? "পোস্টার তৈরি হচ্ছে..." : "২× HD ব্যানার ডাউনলোড করুন"}</span>
+        </button>
       </div>
     </div>
   );
