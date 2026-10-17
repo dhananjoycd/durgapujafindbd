@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import CardEditor from "@/components/card-editor";
 import PujaMap from "@/components/puja-map";
 import CommunityGallery from "@/components/community-gallery";
-import { Sparkles, MapPin, Compass } from "lucide-react";
+import { Sparkles, MapPin, Compass, Lock } from "lucide-react";
 
 export default function Home() {
   const [selectedVenueForCard, setSelectedVenueForCard] = useState<string>("");
@@ -49,6 +50,9 @@ export default function Home() {
           <a className="nav-link" href="#how-it-works">
             ব্যবহার বিধি
           </a>
+          <Link className="nav-link admin-nav-link" href="/admin" target="_blank" title="অ্যাডমিন কন্ট্রোল প্যানেল">
+            <Lock size={12} /> অ্যাডমিন
+          </Link>
         </nav>
 
         <a href="#editor" className="header-cta-btn">
@@ -177,8 +181,11 @@ export default function Home() {
             একটি কার্ড বানান ↑
           </a>
         </div>
-        <div className="footer-bottom">
+        <div className="footer-bottom" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
           <small>© ২০২৬ শারদীয়া — সর্বস্বত্ব সংরক্ষিত · উৎসবের আনন্দে সবার পাশে</small>
+          <Link href="/admin" className="admin-footer-link">
+            <Lock size={12} /> অ্যাডমিন কন্ট্রোল প্যানেল
+          </Link>
         </div>
       </footer>
     </main>

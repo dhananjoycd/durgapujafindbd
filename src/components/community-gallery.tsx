@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Share2, Heart, Award, Sparkles, MessageCircle } from "lucide-react";
 
 interface CommunityCard {
@@ -66,20 +66,45 @@ export default function CommunityGallery() {
   const [cards, setCards] = useState<CommunityCard[]>(initialCards);
   const [likedCards, setLikedCards] = useState<Record<string, boolean>>({});
 
+  useEffect(() => {
+    let isSubscribed = true;
+    fetch("/api/community")
+      .then((res) => res.json())
+      .then((res) => {
+        if (isSubscribed && res.success && Array.isArray(res.data) && res.data.length > 0) {
+          setCards(res.data);
+        }
+      })
+      .catch((e) => console.warn("Could not load community cards from DB:", e));
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, []);
+
   const handleLike = (id: string) => {
+    const isCurrentlyLiked = Boolean(likedCards[id]);
+    const willLike = !isCurrentlyLiked;
+
     setCards((prev) =>
       prev.map((c) => {
         if (c.id === id) {
-          const isLiked = likedCards[id];
           return {
             ...c,
-            likes: isLiked ? c.likes - 1 : c.likes + 1,
+            likes: Math.max(0, willLike ? c.likes + 1 : c.likes - 1),
           };
         }
         return c;
       })
     );
-    setLikedCards((prev) => ({ ...prev, [id]: !prev[id] }));
+    setLikedCards((prev) => ({ ...prev, [id]: willLike }));
+
+    // Sync with PostgreSQL API
+    fetch("/api/community", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "like", id, increment: willLike }),
+    }).catch((e) => console.warn("Failed to sync like with DB:", e));
   };
 
   const handleShareChallenge = () => {

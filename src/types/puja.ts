@@ -29,9 +29,9 @@ export type PujaVenue = {
   lng: number;
   theme: string;
   highlights: string[];
-  anjaliTime: string;
-  aartiTime: string;
-  sandhiPujaTime: string;
+  anjaliTime?: string;
+  aartiTime?: string;
+  sandhiPujaTime?: string;
   crowdStatus: "low" | "moderate" | "heavy";
   crowdUpdatedAt: string;
   crowdReportsCount: number;

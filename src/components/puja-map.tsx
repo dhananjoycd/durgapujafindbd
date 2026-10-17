@@ -121,6 +121,28 @@ export default function PujaMap({ onSelectForCard }: PujaMapProps) {
     return Array.from(new Set(list));
   }, [venues]);
 
+  // Sync with live Neon PostgreSQL / API
+  useEffect(() => {
+    let isSubscribed = true;
+    fetch("/api/venues")
+      .then((res) => res.json())
+      .then((res) => {
+        if (isSubscribed && res.success && Array.isArray(res.data) && res.data.length > 0) {
+          setVenues(res.data);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("sharodiya_venues_bd_v2", JSON.stringify(res.data));
+          }
+        }
+      })
+      .catch((err) => {
+        console.warn("Could not fetch remote venues, using cached:", err);
+      });
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, []);
+
   // Load Leaflet dynamically via CDN
   useEffect(() => {
     let isMounted = true;
@@ -419,6 +441,13 @@ export default function PujaMap({ onSelectForCard }: PujaMapProps) {
       localStorage.setItem("sharodiya_user_votes", JSON.stringify(newVotes));
     }
 
+    // Sync with PostgreSQL API
+    fetch(`/api/venues/${venueId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "vote", voteType }),
+    }).catch((e) => console.warn("Vote sync error:", e));
+
     showToast(
       voteType === "real" 
         ? "✓ ধন্যবাদ! আপনার ভোটে মণ্ডপটির সত্যতা বৃদ্ধি পেল।" 
@@ -455,6 +484,14 @@ export default function PujaMap({ onSelectForCard }: PujaMapProps) {
     if (typeof window !== "undefined") {
       localStorage.setItem("sharodiya_venues_bd_v2", JSON.stringify(updated));
     }
+
+    // Sync crowd report to PostgreSQL API
+    fetch(`/api/venues/${activeVenue.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "crowd", status: newStatus }),
+    }).catch((e) => console.warn("Crowd sync error:", e));
+
     showToast("আপনার ভিড়ের লাইভ রিপোর্ট গ্রহণ করা হয়েছে! ধন্যবাদ।", "success");
   };
 
@@ -477,9 +514,6 @@ export default function PujaMap({ onSelectForCard }: PujaMapProps) {
       lng: Number(targetLng.toFixed(5)),
       theme: newVenueTheme.trim() || "কমিউনিটি সার্বজনীন শারদীয় দুর্গোৎসব",
       highlights: ["কমিউনিটি পূজা", "পারিবারিক সৌহার্দ্য", "সাবেকি রূপ"],
-      anjaliTime: "অষ্টমী সকাল ৯:০০ - ১১:০০",
-      aartiTime: "সন্ধ্যা ৬:৪৫ - ৮:০০",
-      sandhiPujaTime: "অষ্টমী রাত ৮:২৪",
       crowdStatus: "moderate",
       crowdUpdatedAt: "এইমাত্র যোগ করা হয়েছে",
       crowdReportsCount: 1,
@@ -498,6 +532,13 @@ export default function PujaMap({ onSelectForCard }: PujaMapProps) {
     if (typeof window !== "undefined") {
       localStorage.setItem("sharodiya_venues_bd_v2", JSON.stringify(updated));
     }
+
+    // Sync new venue to PostgreSQL API
+    fetch("/api/venues", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(newVenue),
+    }).catch((e) => console.warn("Add venue sync error:", e));
 
     setShowAddModal(false);
     setClickedLocation(null);
@@ -526,7 +567,7 @@ export default function PujaMap({ onSelectForCard }: PujaMapProps) {
             ঢাকা ও দেশের <em>পূজা মণ্ডপ</em> খুঁজুন
           </h2>
           <p className="section-subtext">
-            ঢাকেশ্বরী জাতীয় মন্দির, রমনা কালী মন্দির, শাঁখারীবাজার, বনানীসহ সারা দেশের বিখ্যাত মণ্ডপগুলোর লাইভ ভিড়, অঞ্জলি ও কমিউনিটি ভেরিফিকেশন।
+            ঢাকেশ্বরী জাতীয় মন্দির, রমনা কালী মন্দির, শাঁখারীবাজার, বনানীসহ সারা দেশের বিখ্যাত মণ্ডপগুলোর লাইভ ভিড় ও কমিউনিটি ভেরিফিকেশন।
           </p>
         </div>
 
@@ -703,7 +744,7 @@ export default function PujaMap({ onSelectForCard }: PujaMapProps) {
 
                     <div className="card-footer-info">
                       <span className="timing-chip">
-                        <Clock size={12} /> {v.anjaliTime.split("-")[0]}
+                        <MapPin size={12} /> {v.zone}
                       </span>
                       <span className="reports-chip">
                         <Users size={12} /> {v.crowdReportsCount || 1} জনের রিপোর্ট
@@ -796,20 +837,6 @@ export default function PujaMap({ onSelectForCard }: PujaMapProps) {
                 <strong>ঐতিহ্য ও আকর্ষণ:</strong> {activeVenue.theme}
               </div>
 
-              <div className="timings-row">
-                <div className="time-col">
-                  <small>অঞ্জলির সময়</small>
-                  <span>{activeVenue.anjaliTime}</span>
-                </div>
-                <div className="time-col">
-                  <small>সন্ধিপূজা</small>
-                  <span>{activeVenue.sandhiPujaTime}</span>
-                </div>
-                <div className="time-col">
-                  <small>আরতি</small>
-                  <span>{activeVenue.aartiTime}</span>
-                </div>
-              </div>
 
               {/* REAL vs FAKE VOTING SYSTEM */}
               <div className="verification-vote-section">
@@ -1005,7 +1032,7 @@ export default function PujaMap({ onSelectForCard }: PujaMapProps) {
                 <div className="point-item">
                   <span className="point-dot">১</span>
                   <p>
-                    <strong>লাইভ ডেটাবেজ যুক্ত করার কাজ চলছে:</strong> ঢাকা ও সমগ্র বাংলাদেশের প্রতিটি পূজা মণ্ডপ, সঠিক অঞ্জলি সময়সূচী ও লাইভ ভিড় প্রতিনিয়ত হালনাগাদ করা হচ্ছে।
+                    <strong>লাইভ ডেটাবেজ যুক্ত করার কাজ চলছে:</strong> ঢাকা ও সমগ্র বাংলাদেশের প্রতিটি পূজা মণ্ডপ ও লাইভ ভিড় প্রতিনিয়ত হালনাগাদ করা হচ্ছে।
                   </p>
                 </div>
                 <div className="point-item">
