@@ -167,6 +167,7 @@ export default function PujaMap({ onSelectForCard }: PujaMapProps) {
           center,
           zoom: 12,
           zoomControl: true,
+          doubleClickZoom: false,
         });
 
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -179,8 +180,8 @@ export default function PujaMap({ onSelectForCard }: PujaMapProps) {
         markersGroupRef.current = markersGroup;
         setMapLoaded(true);
 
-        // Click on map to add venue event
-        map.on("click", (e: any) => {
+        // Double-click a map location to open the venue form.
+        map.on("dblclick", (e: any) => {
           const lat = Number(e.latlng.lat.toFixed(5));
           const lng = Number(e.latlng.lng.toFixed(5));
           setClickedLocation({ lat, lng });
@@ -606,7 +607,7 @@ export default function PujaMap({ onSelectForCard }: PujaMapProps) {
       <div className="map-click-hint-strip">
         <Info size={15} />
         <span>
-          💡 <strong>টিপস:</strong> আপনার বর্তমান লাইভ লোকেশনে গিয়ে <strong>ম্যাপের যেকোনো জায়গায় ক্লিক করলেই</strong> সেই নির্দিষ্ট অবস্থানে নতুন মণ্ডপ যুক্ত করতে পারবেন!
+          💡 <strong>টিপস:</strong> ম্যাপ স্ক্রল বা ঘোরাতে সাধারণ ক্লিক/ড্র্যাগ করুন। <strong>নতুন মণ্ডপ যুক্ত করতে ম্যাপে ডবল-ক্লিক করুন</strong>।
         </span>
       </div>
 

@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { NextRequest } from "next/server";
-import { createAdminSession, isAdminRequest, isSameOrigin, unauthorized } from "@/lib/admin-auth";
+import {
+  createAdminSession,
+  isAdminRequest,
+  isSameOrigin,
+  unauthorized,
+} from "@/lib/admin-auth";
 import {
   getAllVenues,
   getAllCommunityCards,
@@ -11,14 +16,24 @@ import {
 
 export async function POST(request: NextRequest) {
   try {
-    if (!isSameOrigin(request)) return NextResponse.json({ success: false }, { status: 403 });
+    if (!isSameOrigin(request))
+      return NextResponse.json({ success: false }, { status: 403 });
     if (!process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD.length < 16) {
-      return NextResponse.json({ success: false, error: "Set a long ADMIN_PASSWORD in deployment settings." }, { status: 503 });
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Set a long ADMIN_PASSWORD in deployment settings.",
+        },
+        { status: 503 },
+      );
     }
     const body = await request.json();
     const { password } = body;
 
-    if (typeof password !== "string" || password !== process.env.ADMIN_PASSWORD) {
+    if (
+      typeof password !== "string" ||
+      password !== process.env.ADMIN_PASSWORD
+    ) {
       return NextResponse.json(
         {
           success: false,
@@ -32,7 +47,8 @@ export async function POST(request: NextRequest) {
       success: true,
       message: "অ্যাডমিন লগইন সফল হয়েছে!",
     });
-    if (!createAdminSession(response)) return NextResponse.json({ success: false }, { status: 503 });
+    if (!createAdminSession(response))
+      return NextResponse.json({ success: false }, { status: 503 });
     return response;
   } catch (error: any) {
     return NextResponse.json(
@@ -100,8 +116,12 @@ export async function GET(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  if (!isSameOrigin(request)) return NextResponse.json({ success: false }, { status: 403 });
+  if (!isSameOrigin(request))
+    return NextResponse.json({ success: false }, { status: 403 });
   const response = NextResponse.json({ success: true });
-  response.headers.append("Set-Cookie", `sharodiya_admin=; HttpOnly; Path=/; SameSite=Strict; Max-Age=0${process.env.NODE_ENV === "production" ? "; Secure" : ""}`);
+  response.headers.append(
+    "Set-Cookie",
+    `sharodiya_admin=; HttpOnly; Path=/; SameSite=Strict; Max-Age=0${process.env.NODE_ENV === "production" ? "; Secure" : ""}`,
+  );
   return response;
 }
