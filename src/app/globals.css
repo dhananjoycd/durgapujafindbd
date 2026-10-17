@@ -2592,6 +2592,32 @@ footer {
   font-size: 11px;
   color: #8c8e82;
 }
+.developer-credit,
+.ai-disclaimer {
+  margin: 0;
+}
+.developer-credit {
+  color: #67695e;
+  font-size: 14px;
+}
+.developer-credit a {
+  color: #a52b23;
+  font-size: 19px;
+  font-weight: 750;
+  text-decoration: none;
+  text-underline-offset: 4px;
+  transition: color 160ms ease;
+}
+.developer-credit a:hover {
+  color: #741b17;
+  text-decoration: underline;
+}
+.ai-disclaimer {
+  flex-basis: 100%;
+  color: #929388;
+  font-size: 11px;
+  text-align: right;
+}
 
 /* ADMIN LINK IN HEADER & FOOTER */
 .admin-nav-link {
